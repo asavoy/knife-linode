@@ -19,6 +19,7 @@
 #
 
 require 'chef/knife/linode_base'
+require 'tempfile'
 
 class Chef
   class Knife
@@ -219,7 +220,17 @@ class Chef
       end
 
       def bootstrap_for_node(server,fqdn)
-        bootstrap = Chef::Knife::Bootstrap.new
+
+        # Get private ip and save to the hints.
+        private_ip = server.ips.select { |lip| !lip.public }.first.ip
+        # Unfortunately, the :hints option only handles a file path, so
+        # write the hints to a temp file.
+        tmpfile = Tempfile.new('linode-hint')
+        #tmpfile = File.open('privateip.json', 'w')
+        tmpfile << "{ \"private_ip\": \"#{private_ip}\" }"
+        tmpfile.flush
+
+        bootstrap = Chef::Knife::Bootstrap.new ['--hint', "linode=#{tmpfile.path}"]
         bootstrap.name_args = [fqdn]
         bootstrap.config[:run_list] = config[:run_list]
         bootstrap.config[:ssh_user] = config[:ssh_user]
